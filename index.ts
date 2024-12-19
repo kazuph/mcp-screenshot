@@ -2,32 +2,30 @@
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import type {
-	CallToolRequest,
-	ListToolsRequest,
+import {
+	CallToolRequestSchema,
+	ListToolsRequestSchema,
+	ToolSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
-import { createWorker } from "tesseract.js";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
+import { createWorker } from "tesseract.js";
+import sharp from "sharp";
 
 const execFileAsync = promisify(execFile);
 
 // Screenshot region types
-type Region = "left" | "right" | "full";
-
 const ScreenshotArgsSchema = z.object({
 	region: z.enum(["left", "right", "full"]).default("left"),
 });
 
-interface ScreenshotResult {
-	imagePath: string;
-	ocrText: string;
-}
+const ToolInputSchema = ToolSchema.shape.inputSchema;
+type ToolInput = z.infer<typeof ToolInputSchema>;
 
 async function ensureDateDirectory(): Promise<string> {
 	const now = new Date();
@@ -42,36 +40,97 @@ async function ensureDateDirectory(): Promise<string> {
 	return dateDir;
 }
 
-async function takeScreenshot(region: Region): Promise<string> {
+async function getDisplayDimensions(): Promise<{
+	width: number;
+	height: number;
+}> {
+	try {
+		// Get the actual pixel dimensions using system_profiler
+		const { stdout } = await execFileAsync("system_profiler", [
+			"SPDisplaysDataType",
+			"-json",
+		]);
+		const data = JSON.parse(stdout);
+		const mainDisplay = data.SPDisplaysDataType[0].spdisplays_ndrvs[0];
+		const dimensions = mainDisplay._spdisplays_pixels.split(" x ");
+
+		// Convert dimensions to numbers
+		const width = Number(dimensions[0]);
+		const height = Number(dimensions[1]);
+
+		if (!width || !height || Number.isNaN(width) || Number.isNaN(height)) {
+			throw new Error(
+				`Invalid display dimensions: width=${width}, height=${height}`,
+			);
+		}
+
+		console.error(
+			`Debug: Display dimensions - width: ${width}, height: ${height}`,
+		);
+		return { width, height };
+	} catch (error) {
+		throw new Error(`Failed to get display dimensions: ${error}`);
+	}
+}
+async function takeScreenshot(
+	region: z.infer<typeof ScreenshotArgsSchema>["region"],
+): Promise<string> {
 	const dateDir = await ensureDateDirectory();
 	const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
 	const filename = `screenshot-${region}-${timestamp}.png`;
 	const filepath = join(dateDir, filename);
 
-	// AppleScript to capture screenshot of specified region
-	let bounds;
-	switch (region) {
-		case "left":
-			bounds = "0, 0, (item 3 of res) div 2, item 4 of res";
-			break;
-		case "right":
-			bounds = "(item 3 of res) div 2, 0, item 3 of res, item 4 of res";
-			break;
-		case "full":
-			bounds = "0, 0, item 3 of res, item 4 of res";
-			break;
+	try {
+		// メインディスプレイのサイズを取得
+		const { width, height } = await getDisplayDimensions();
+		console.error(
+			`Debug: Display dimensions - width: ${width}, height: ${height}`,
+		);
+
+		// 常にフルスクリーンでキャプチャ
+		await execFileAsync("screencapture", [filepath]);
+
+		// 必要に応じて画像を加工
+		if (region !== "full") {
+			const tempFilePath = `${filepath}.temp.png`;
+			await sharp(filepath).toFile(tempFilePath);
+
+			const metadata = await sharp(tempFilePath).metadata();
+			if (!metadata.width || !metadata.height) {
+				throw new Error("Failed to get image dimensions");
+			}
+
+			const halfWidth = Math.floor(metadata.width / 2);
+
+			// 左半分または右半分を切り出し
+			if (region === "left") {
+				await sharp(tempFilePath)
+					.extract({
+						left: 0,
+						top: 0,
+						width: halfWidth,
+						height: metadata.height,
+					})
+					.toFile(filepath);
+			} else if (region === "right") {
+				await sharp(tempFilePath)
+					.extract({
+						left: halfWidth,
+						top: 0,
+						width: halfWidth,
+						height: metadata.height,
+					})
+					.toFile(filepath);
+			}
+
+			// 一時ファイルを削除
+			await execFileAsync("rm", [tempFilePath]);
+		}
+
+		return filepath;
+	} catch (error) {
+		throw new Error(`Screenshot capture failed: ${error}`);
 	}
-
-	const script = `
-    tell application "System Events"
-      set res to get size of window 1 of (first application process whose frontmost is true)
-      set {x, y, w, h} to {${bounds}}
-      do shell script "screencapture -R " & x & "," & y & "," & w & "," & h & " " & quoted form of "${filepath}"
-    end tell
-  `;
-
-	await execFileAsync("osascript", ["-e", script]);
-	return filepath;
 }
 
 async function performOCR(imagePath: string): Promise<string> {
@@ -92,70 +151,65 @@ const server = new Server(
 	{
 		capabilities: {
 			tools: {},
-			resources: {},
 		},
 	},
 );
 
-server.setRequestHandler(
-	z.object({ method: z.literal("tools/list") }),
-	async () => ({
-		tools: [
-			{
-				name: "capture",
-				description:
-					"Captures a screenshot of the specified region (left/right/full), saves it to a dated directory in Downloads, and performs OCR.",
-				inputSchema: zodToJsonSchema(ScreenshotArgsSchema),
-			},
-		],
-	}),
-);
+// Tool handlers
+server.setRequestHandler(ListToolsRequestSchema, async () => ({
+	tools: [
+		{
+			name: "capture",
+			description:
+				"Captures a screenshot of the specified region (left/right/full) of the screen, saves it to a dated directory in Downloads, and performs OCR.",
+			inputSchema: zodToJsonSchema(ScreenshotArgsSchema) as ToolInput,
+		},
+	],
+}));
 
-server.setRequestHandler(
-	z.object({
-		method: z.literal("tools/call"),
-		params: z.object({
-			name: z.string(),
-			arguments: z.record(z.unknown()).optional(),
-		}),
-	}),
-	async (request) => {
-		try {
-			const { name, arguments: args } = request.params;
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
+	try {
+		const { name, arguments: args } = request.params;
 
-			if (name !== "capture") {
-				throw new Error(`Unknown tool: ${name}`);
-			}
-
-			const parsed = ScreenshotArgsSchema.safeParse(args);
-			if (!parsed.success) {
-				throw new Error(`Invalid arguments: ${parsed.error}`);
-			}
-
-			const imagePath = await takeScreenshot(parsed.data.region);
-			const ocrText = await performOCR(imagePath);
-
-			return {
-				content: [
-					{
-						type: "text",
-						text: `Screenshot saved to: ${imagePath}\n\nOCR Results:\n${ocrText}`,
-					},
-				],
-			};
-		} catch (error) {
-			return {
-				content: [
-					{
-						type: "text",
-						text: `Error: ${error instanceof Error ? error.message : String(error)}`,
-					},
-				],
-				isError: true,
-			};
+		if (name !== "capture") {
+			throw new Error(`Unknown tool: ${name}`);
 		}
-	},
-);
+
+		const parsed = ScreenshotArgsSchema.safeParse(args);
+		if (!parsed.success) {
+			throw new Error(`Invalid arguments: ${parsed.error}`);
+		}
+
+		console.error(
+			`Debug: Starting screenshot capture for region: ${parsed.data.region}`,
+		);
+		const imagePath = await takeScreenshot(parsed.data.region);
+		console.error(`Debug: Screenshot saved to: ${imagePath}`);
+
+		const ocrText = await performOCR(imagePath);
+		console.error("Debug: OCR completed");
+
+		return {
+			content: [
+				{
+					type: "text",
+					text: `Screenshot saved to: ${imagePath}\n\nOCR Results:\n${ocrText}`,
+				},
+			],
+		};
+	} catch (error) {
+		console.error("Error:", error);
+		return {
+			content: [
+				{
+					type: "text",
+					text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+				},
+			],
+			isError: true,
+		};
+	}
+});
 
 // Start server
 async function runServer() {
@@ -165,6 +219,6 @@ async function runServer() {
 }
 
 runServer().catch((error) => {
-	process.stderr.write(`Fatal error running server: ${error}\n`);
+	console.error("Fatal error running server:", error);
 	process.exit(1);
 });

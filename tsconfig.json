@@ -9,7 +9,18 @@
     "outDir": "./dist",
     "rootDir": ".",
     "moduleResolution": "NodeNext",
-    "module": "NodeNext"
+    "module": "NodeNext",
+    "allowJs": true,
+    "declaration": true,
+    "baseUrl": ".",
+    "paths": {
+      "@modelcontextprotocol/sdk": [
+        "node_modules/@modelcontextprotocol/sdk/dist/index.js"
+      ],
+      "@modelcontextprotocol/sdk/*": [
+        "node_modules/@modelcontextprotocol/sdk/dist/*"
+      ]
+    }
   },
   "exclude": [
     "node_modules",

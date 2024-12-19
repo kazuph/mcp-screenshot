@@ -2,6 +2,8 @@
 
 A Model Context Protocol server that provides screenshot and OCR capabilities for macOS.
 
+<a href="https://glama.ai/mcp/servers/vcnmmaejv8"><img width="380" height="200" src="https://glama.ai/mcp/servers/vcnmmaejv8/badge" alt="mcp-screenshot MCP server" /></a>
+
 ## Features
 
 - Take screenshots of specific regions (left half, right half, or full screen)

@@ -35,7 +35,7 @@ type ToolInput = z.infer<typeof ToolInputSchema>;
 
 // 環境変数の型定義
 const API_CONFIG = {
-	OCR_API_URL: process.env.OCR_API_URL || "http://localhost:8000",
+	OCR_API_URL: process.env.OCR_API_URL || "http://localhost:8000" + "/analyze",
 	OCR_API_PATH: "/analyze",
 } as const;
 
@@ -166,12 +166,14 @@ async function performOCR(
 			throw new Error(`OCR API returned status ${response.status}`);
 		}
 
-		return response.data.content;
+		// <br>タグを削除
+		const content = response.data.content.replace(/<br\s*\/?>/g, "");
+		return content;
 	} catch (error) {
 		console.error("OCR API error, falling back to Tesseract.js:", error);
 
 		try {
-			// 日語と英語の両方を認識できるように設定
+			// 日本語と英語の両方を認識できるように設定
 			console.error("OCR: Creating worker for Japanese and English...");
 			const worker = await createWorker("jpn+eng");
 			console.error("OCR: Starting recognition...");

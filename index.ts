@@ -35,7 +35,8 @@ type ToolInput = z.infer<typeof ToolInputSchema>;
 
 // 環境変数の型定義
 const API_CONFIG = {
-	OCR_API_URL: process.env.OCR_API_URL || "http://ubuntu-3090:8000/analyze",
+	OCR_API_URL: process.env.OCR_API_URL || "http://localhost:8000",
+	OCR_API_PATH: "/analyze",
 } as const;
 
 async function ensureDateDirectory(): Promise<string> {
@@ -154,7 +155,7 @@ async function performOCR(
 		});
 
 		const response = await axios.post(
-			`${API_CONFIG.OCR_API_URL}?format=${format}`,
+			`${API_CONFIG.OCR_API_URL}${API_CONFIG.OCR_API_PATH}?format=${format}`,
 			formData,
 			{
 				headers: formData.getHeaders(),
@@ -170,7 +171,7 @@ async function performOCR(
 		console.error("OCR API error, falling back to Tesseract.js:", error);
 
 		try {
-			// 日本語と英語の両方を認識できるように設定
+			// 日語と英語の両方を認識できるように設定
 			console.error("OCR: Creating worker for Japanese and English...");
 			const worker = await createWorker("jpn+eng");
 			console.error("OCR: Starting recognition...");

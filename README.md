@@ -1,23 +1,36 @@
 # MCP Screenshot
 
-A Model Context Protocol server that provides screenshot and OCR capabilities for macOS.
+スクリーンショットを撮影し、OCRで文字認識を行うMCPサーバーです。
 
-## Features
+## 機能
 
-- Take screenshots of specific regions (left half, right half, or full screen)
-- Automatically save screenshots to dated folders in Downloads directory
-- Perform OCR on captured screenshots
-- Return OCR text results
+- スクリーンショットの撮影（左半分、右半分、全画面）
+- OCRによるテキスト認識（日本語・英語対応）
+- 複数の出力フォーマット対応（JSON, Markdown, 縦書き, 横書き）
 
-## Installation
+## OCRエンジン
+
+このサーバーは以下の2つのOCRエンジンを使用します：
+
+1. [yomitoku](https://github.com/kazuph/yomitoku)
+   - メインのOCRエンジン
+   - 高精度な日本語認識が可能
+   - APIサーバーとして動作
+
+2. [Tesseract.js](https://github.com/naptha/tesseract.js)
+   - フォールバック用OCRエンジン
+   - yomitokuが利用できない場合に使用
+   - 日本語と英語の認識に対応
+
+## インストール
 
 ```bash
-npm install -g @kazuph/mcp-screenshot
+npx -y @kazuph/mcp-screenshot
 ```
 
-## Configuration
+## Claude Desktopでの設定
 
-Add the following to your Claude Desktop configuration (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+`claude_desktop_config.json` に以下のように設定を追加します：
 
 ```json
 {
@@ -25,56 +38,42 @@ Add the following to your Claude Desktop configuration (`~/Library/Application S
     "screenshot": {
       "command": "npx",
       "args": ["-y", "@kazuph/mcp-screenshot"],
-      "disabled": false
+      "env": {
+        "OCR_API_URL": "http://localhost:8000"  // yomitoku APIのベースURL
+      }
     }
   }
 }
 ```
 
-### Required Setup
+## 環境変数
 
-1. Enable Screen Recording for Claude:
-   - Open System Settings
-   - Go to Privacy & Security > Screen Recording
-   - Click the "+" button
-   - Add Claude from your Applications folder
-   - Turn ON the toggle for Claude
+| 変数名 | 説明 | デフォルト値 |
+|--------|------|--------------|
+| OCR_API_URL | yomitoku APIのベースURL | http://localhost:8000 |
 
-2. Enable Accessibility for Claude:
-   - Open System Settings
-   - Go to Privacy & Security > Accessibility
-   - Click the "+" button
-   - Add Claude from your Applications folder
-   - Turn ON the toggle for Claude
+## 使用例
 
-## Usage
+Claudeに以下のように指示することで利用できます：
 
-The server provides a `capture` tool with the following options:
-
-- `region`: Specify which part of the screen to capture
-  - `"left"`: Capture left half of the screen (default)
-  - `"right"`: Capture right half of the screen
-  - `"full"`: Capture entire screen
-
-Screenshots are automatically saved to a dated folder in your Downloads directory (e.g., `~/Downloads/20240119/`).
-
-## Development
-
-```bash
-# Clone the repository
-git clone https://github.com/kazuph/mcp-screenshot.git
-cd mcp-screenshot
-
-# Install dependencies
-npm install
-
-# Build the project
-npm run build
-
-# Run in development mode
-npm run dev
+```
+画面の左半分をスクリーンショットして、その中のテキストを認識してください。
 ```
 
-## License
+## ツールの仕様
+
+### capture
+
+スクリーンショットを撮影し、OCRを実行します。
+
+オプション：
+- `region`: スクリーンショット領域 ('left'/'right'/'full', デフォルト: 'left')
+- `format`: 出力フォーマット ('json'/'markdown'/'vertical'/'horizontal', デフォルト: 'markdown')
+
+## ライセンス
 
 MIT
+
+## 作者
+
+kazuph

@@ -145,7 +145,7 @@ async function takeScreenshot(
 }
 async function performOCR(
 	imagePath: string,
-	format: string = "markdown",
+	format = "markdown",
 ): Promise<string> {
 	try {
 		const formData = new FormData();
@@ -170,11 +170,15 @@ async function performOCR(
 		console.error("OCR API error, falling back to Tesseract.js:", error);
 
 		try {
-			// Tesseract.jsを使用したフォールバック処理
-			const worker = await createWorker("eng");
+			// 日本語と英語の両方を認識できるように設定
+			console.error("OCR: Creating worker for Japanese and English...");
+			const worker = await createWorker("jpn+eng");
+			console.error("OCR: Starting recognition...");
+
 			const {
 				data: { text },
 			} = await worker.recognize(imagePath);
+			console.error("OCR: Recognition completed");
 			await worker.terminate();
 
 			// フォーマットに応じて出力を整形
@@ -184,7 +188,7 @@ async function performOCR(
 					formattedText = JSON.stringify({ content: text.trim() });
 					break;
 				case "markdown":
-					formattedText = "```\n" + text.trim() + "\n```";
+					formattedText = `\`\`\`\n${text.trim()}\n\`\`\``;
 					break;
 				case "vertical":
 					formattedText = text.trim().split("\n").join("\n\n");
@@ -196,6 +200,7 @@ async function performOCR(
 
 			return formattedText;
 		} catch (tesseractError) {
+			console.error("Tesseract.js error details:", tesseractError);
 			throw new Error(
 				`Both OCR API and Tesseract.js failed. API error: ${error instanceof Error ? error.message : String(error)}. Tesseract error: ${tesseractError instanceof Error ? tesseractError.message : String(tesseractError)}`,
 			);

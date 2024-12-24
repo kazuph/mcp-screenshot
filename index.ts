@@ -16,16 +16,27 @@ import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { createWorker } from "tesseract.js";
 import sharp from "sharp";
+import { createReadStream } from "node:fs";
+import axios from "axios";
+import FormData from "form-data";
 
 const execFileAsync = promisify(execFile);
 
 // Screenshot region types
 const ScreenshotArgsSchema = z.object({
 	region: z.enum(["left", "right", "full"]).default("left"),
+	format: z
+		.enum(["json", "markdown", "vertical", "horizontal"])
+		.default("markdown"),
 });
 
 const ToolInputSchema = ToolSchema.shape.inputSchema;
 type ToolInput = z.infer<typeof ToolInputSchema>;
+
+// 環境変数の型定義
+const API_CONFIG = {
+	OCR_API_URL: process.env.OCR_API_URL || "http://ubuntu-3090:8000/analyze",
+} as const;
 
 async function ensureDateDirectory(): Promise<string> {
 	const now = new Date();
@@ -132,16 +143,36 @@ async function takeScreenshot(
 		throw new Error(`Screenshot capture failed: ${error}`);
 	}
 }
+async function performOCR(
+	imagePath: string,
+	format: string = "markdown",
+): Promise<string> {
+	try {
+		const formData = new FormData();
+		formData.append("file", createReadStream(imagePath), {
+			filename: imagePath.split("/").pop(),
+		});
 
-async function performOCR(imagePath: string): Promise<string> {
-	const worker = await createWorker("eng");
-	const {
-		data: { text },
-	} = await worker.recognize(imagePath);
-	await worker.terminate();
-	return text;
+		const response = await axios.post(
+			`${API_CONFIG.OCR_API_URL}?format=${format}`,
+			formData,
+			{
+				headers: formData.getHeaders(),
+			},
+		);
+
+		if (response.status !== 200) {
+			throw new Error(`OCR API returned status ${response.status}`);
+		}
+
+		return response.data.content;
+	} catch (error) {
+		console.error("OCR API error:", error);
+		throw new Error(
+			`OCR failed: ${error instanceof Error ? error.message : String(error)}`,
+		);
+	}
 }
-
 // Server setup
 const server = new Server(
 	{
@@ -161,7 +192,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
 		{
 			name: "capture",
 			description:
-				"Captures a screenshot of the specified region (left/right/full) of the screen, saves it to a dated directory in Downloads, and performs OCR.",
+				"Captures a screenshot of the specified region and performs OCR. " +
+				"Options:\n" +
+				"- region: 'left'/'right'/'full' (default: 'left')\n" +
+				"- format: 'json'/'markdown'/'vertical'/'horizontal' (default: 'markdown')\n" +
+				"The screenshot is saved to a dated directory in Downloads.",
 			inputSchema: zodToJsonSchema(ScreenshotArgsSchema) as ToolInput,
 		},
 	],
@@ -181,12 +216,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 		}
 
 		console.error(
-			`Debug: Starting screenshot capture for region: ${parsed.data.region}`,
+			`Debug: Starting screenshot capture for region: ${parsed.data.region}, format: ${parsed.data.format}`,
 		);
 		const imagePath = await takeScreenshot(parsed.data.region);
 		console.error(`Debug: Screenshot saved to: ${imagePath}`);
 
-		const ocrText = await performOCR(imagePath);
+		const ocrText = await performOCR(imagePath, parsed.data.format);
 		console.error("Debug: OCR completed");
 
 		return {

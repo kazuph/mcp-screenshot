@@ -167,10 +167,39 @@ async function performOCR(
 
 		return response.data.content;
 	} catch (error) {
-		console.error("OCR API error:", error);
-		throw new Error(
-			`OCR failed: ${error instanceof Error ? error.message : String(error)}`,
-		);
+		console.error("OCR API error, falling back to Tesseract.js:", error);
+
+		try {
+			// Tesseract.jsを使用したフォールバック処理
+			const worker = await createWorker("eng");
+			const {
+				data: { text },
+			} = await worker.recognize(imagePath);
+			await worker.terminate();
+
+			// フォーマットに応じて出力を整形
+			let formattedText = text.trim();
+			switch (format) {
+				case "json":
+					formattedText = JSON.stringify({ content: text.trim() });
+					break;
+				case "markdown":
+					formattedText = "```\n" + text.trim() + "\n```";
+					break;
+				case "vertical":
+					formattedText = text.trim().split("\n").join("\n\n");
+					break;
+				case "horizontal":
+					formattedText = text.trim().replace(/\n/g, " ");
+					break;
+			}
+
+			return formattedText;
+		} catch (tesseractError) {
+			throw new Error(
+				`Both OCR API and Tesseract.js failed. API error: ${error instanceof Error ? error.message : String(error)}. Tesseract error: ${tesseractError instanceof Error ? tesseractError.message : String(tesseractError)}`,
+			);
+		}
 	}
 }
 // Server setup

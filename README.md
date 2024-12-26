@@ -1,36 +1,36 @@
 # MCP Screenshot
 
-スクリーンショットを撮影し、OCRで文字認識を行うMCPサーバーです。
+An MCP server that captures screenshots and performs OCR text recognition.
 
-## 機能
+## Features
 
-- スクリーンショットの撮影（左半分、右半分、全画面）
-- OCRによるテキスト認識（日本語・英語対応）
-- 複数の出力フォーマット対応（JSON, Markdown, 縦書き, 横書き）
+- Screenshot capture (left half, right half, full screen)
+- OCR text recognition (supports Japanese and English)
+- Multiple output formats (JSON, Markdown, vertical, horizontal)
 
-## OCRエンジン
+## OCR Engines
 
-このサーバーは以下の2つのOCRエンジンを使用します：
+This server uses two OCR engines:
 
 1. [yomitoku](https://github.com/kazuph/yomitoku)
-   - メインのOCRエンジン
-   - 高精度な日本語認識が可能
-   - APIサーバーとして動作
+   - Primary OCR engine
+   - High-accuracy Japanese text recognition
+   - Runs as an API server
 
 2. [Tesseract.js](https://github.com/naptha/tesseract.js)
-   - フォールバック用OCRエンジン
-   - yomitokuが利用できない場合に使用
-   - 日本語と英語の認識に対応
+   - Fallback OCR engine
+   - Used when yomitoku is unavailable
+   - Supports both Japanese and English recognition
 
-## インストール
+## Installation
 
 ```bash
 npx -y @kazuph/mcp-screenshot
 ```
 
-## Claude Desktopでの設定
+## Claude Desktop Configuration
 
-`claude_desktop_config.json` に以下のように設定を追加します：
+Add the following configuration to your `claude_desktop_config.json`:
 
 ```json
 {
@@ -39,41 +39,41 @@ npx -y @kazuph/mcp-screenshot
       "command": "npx",
       "args": ["-y", "@kazuph/mcp-screenshot"],
       "env": {
-        "OCR_API_URL": "http://localhost:8000"  // yomitoku APIのベースURL
+        "OCR_API_URL": "http://localhost:8000"  // yomitoku API base URL
       }
     }
   }
 }
 ```
 
-## 環境変数
+## Environment Variables
 
-| 変数名 | 説明 | デフォルト値 |
-|--------|------|--------------|
-| OCR_API_URL | yomitoku APIのベースURL | http://localhost:8000 |
+| Variable Name | Description | Default Value |
+|--------------|-------------|---------------|
+| OCR_API_URL | yomitoku API base URL | http://localhost:8000 |
 
-## 使用例
+## Usage Example
 
-Claudeに以下のように指示することで利用できます：
+You can use it by instructing Claude like this:
 
 ```
-画面の左半分をスクリーンショットして、その中のテキストを認識してください。
+Please take a screenshot of the left half of the screen and recognize the text in it.
 ```
 
-## ツールの仕様
+## Tool Specification
 
 ### capture
 
-スクリーンショットを撮影し、OCRを実行します。
+Takes a screenshot and performs OCR.
 
-オプション：
-- `region`: スクリーンショット領域 ('left'/'right'/'full', デフォルト: 'left')
-- `format`: 出力フォーマット ('json'/'markdown'/'vertical'/'horizontal', デフォルト: 'markdown')
+Options:
+- `region`: Screenshot area ('left'/'right'/'full', default: 'left')
+- `format`: Output format ('json'/'markdown'/'vertical'/'horizontal', default: 'markdown')
 
-## ライセンス
+## License
 
 MIT
 
-## 作者
+## Author
 
 kazuph

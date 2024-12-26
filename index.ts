@@ -33,7 +33,7 @@ const ScreenshotArgsSchema = z.object({
 const ToolInputSchema = ToolSchema.shape.inputSchema;
 type ToolInput = z.infer<typeof ToolInputSchema>;
 
-// 環境変数の型定義
+// Environment variable type definition
 const API_CONFIG = {
 	OCR_API_URL: process.env.OCR_API_URL || "http://localhost:8000" + "/analyze",
 	OCR_API_PATH: "/analyze",
@@ -93,16 +93,16 @@ async function takeScreenshot(
 	const filepath = join(dateDir, filename);
 
 	try {
-		// メインディスプレイのサイズを取得
+		// Get main display dimensions
 		const { width, height } = await getDisplayDimensions();
 		console.error(
 			`Debug: Display dimensions - width: ${width}, height: ${height}`,
 		);
 
-		// 常にフルスクリーンでキャプチャ
+		// Always capture full screen
 		await execFileAsync("screencapture", [filepath]);
 
-		// 必要に応じて画像を加工
+		// Process image if needed
 		if (region !== "full") {
 			const tempFilePath = `${filepath}.temp.png`;
 			await sharp(filepath).toFile(tempFilePath);
@@ -114,7 +114,7 @@ async function takeScreenshot(
 
 			const halfWidth = Math.floor(metadata.width / 2);
 
-			// 左半分または右半分を切り出し
+			// Extract left or right half
 			if (region === "left") {
 				await sharp(tempFilePath)
 					.extract({
@@ -135,7 +135,7 @@ async function takeScreenshot(
 					.toFile(filepath);
 			}
 
-			// 一時ファイルを削除
+			// Remove temporary file
 			await execFileAsync("rm", [tempFilePath]);
 		}
 
@@ -166,14 +166,14 @@ async function performOCR(
 			throw new Error(`OCR API returned status ${response.status}`);
 		}
 
-		// <br>タグを削除
+		// Remove <br> tags
 		const content = response.data.content.replace(/<br\s*\/?>/g, "");
 		return content;
 	} catch (error) {
 		console.error("OCR API error, falling back to Tesseract.js:", error);
 
 		try {
-			// 日本語と英語の両方を認識できるように設定
+			// Configure worker for both Japanese and English recognition
 			console.error("OCR: Creating worker for Japanese and English...");
 			const worker = await createWorker("jpn+eng");
 			console.error("OCR: Starting recognition...");
@@ -184,7 +184,7 @@ async function performOCR(
 			console.error("OCR: Recognition completed");
 			await worker.terminate();
 
-			// フォーマットに応じて出力を整形
+			// Format output according to specified format
 			let formattedText = text.trim();
 			switch (format) {
 				case "json":

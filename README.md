@@ -2,6 +2,8 @@
 
 An MCP server that captures screenshots and performs OCR text recognition.
 
+<a href="https://glama.ai/mcp/servers/vcnmmaejv8"><img width="380" height="200" src="https://glama.ai/mcp/servers/vcnmmaejv8/badge" alt="mcp-screenshot MCP server" /></a>
+
 ## Features
 
 - Screenshot capture (left half, right half, full screen)

@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/kazuph-mcp-screenshot-badge.png)](https://mseep.ai/app/kazuph-mcp-screenshot)
+
 # MCP Screenshot
 
 An MCP server that captures screenshots and performs OCR text recognition.

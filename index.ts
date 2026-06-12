@@ -5,7 +5,6 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import {
 	CallToolRequestSchema,
 	ListToolsRequestSchema,
-	ToolSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -14,6 +13,10 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
+import { createRequire } from "node:module";
+
+// Keep serverInfo in sync with the published npm version (dist/ -> ../package.json)
+const PKG_VERSION: string = createRequire(import.meta.url)("../package.json").version;
 import { createWorker } from "tesseract.js";
 import sharp from "sharp";
 import { createReadStream } from "node:fs";
@@ -29,9 +32,6 @@ const ScreenshotArgsSchema = z.object({
 		.enum(["json", "markdown", "vertical", "horizontal"])
 		.default("markdown"),
 });
-
-const ToolInputSchema = ToolSchema.shape.inputSchema;
-type ToolInput = z.infer<typeof ToolInputSchema>;
 
 // Environment variable type definition
 const API_CONFIG = {
@@ -214,7 +214,7 @@ async function performOCR(
 const server = new Server(
 	{
 		name: "mcp-screenshot",
-		version: "1.0.0",
+		version: PKG_VERSION,
 	},
 	{
 		capabilities: {
@@ -234,7 +234,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
 				"- region: 'left'/'right'/'full' (default: 'left')\n" +
 				"- format: 'json'/'markdown'/'vertical'/'horizontal' (default: 'markdown')\n" +
 				"The screenshot is saved to a dated directory in Downloads.",
-			inputSchema: zodToJsonSchema(ScreenshotArgsSchema) as ToolInput,
+			inputSchema: zodToJsonSchema(ScreenshotArgsSchema),
 		},
 	],
 }));
